@@ -57,16 +57,17 @@ export default function Home() {
   };
 
   const handleSubmit = async (values) => {
-    const date = moment(values.date).format("YYYY-MM-DD");
-    const time = moment(values.time).format("HH:mm");
+    const date = values.date.format("YYYY-MM-DD");
+    const time = values.time.format("HH:mm:ss");
+
+    const dateTime = moment(`${date}T${time}`).toISOString();
 
     const response = await fetch("/api/bookings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...values,
-        date,
-        time,
+        date: dateTime, // Use the combined dateTime
       }),
     });
 
@@ -81,6 +82,8 @@ export default function Home() {
       setFilteredBookings([...bookings, formattedBooking]);
       form.resetFields();
       setFormVisible(false);
+    } else {
+      message.error("Failed to add booking");
     }
   };
 
@@ -95,35 +98,42 @@ export default function Home() {
   };
 
   const handleUpdate = async (values) => {
-    const date = moment(values.date).format("YYYY-MM-DD");
-    const time = moment(values.time).format("HH:mm");
+    const date = values.date.format("YYYY-MM-DD");
+    const time = values.time.format("HH:mm:ss");
+    const dateTime = moment(`${date}T${time}`).toISOString();
 
-    const response = await fetch(`/api/bookings?id=${editingBooking.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...values,
-        date,
-        time,
-      }),
-    });
+    try {
+      const response = await fetch(`/api/bookings`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: editingBooking.id, // Ensure the id is included
+          ...values,
+          date: dateTime,
+        }),
+      });
 
-    if (response.ok) {
-      const updatedBooking = await response.json();
-      const formattedBooking = {
-        ...updatedBooking,
-        date: moment(updatedBooking.date).format("YYYY-MM-DD"),
-        time: moment(updatedBooking.time, "HH:mm:ss").format("HH:mm"),
-      };
-      const updatedBookings = bookings.map((booking) =>
-        booking.id === updatedBooking.id ? formattedBooking : booking
-      );
-      setBookings(updatedBookings);
-      setFilteredBookings(updatedBookings);
-      setEditVisible(false);
-      setEditingBooking(null);
-      message.success("Booking updated successfully");
-    } else {
+      if (response.ok) {
+        const updatedBooking = await response.json();
+        const formattedBooking = {
+          ...updatedBooking,
+          date: moment(updatedBooking.date).format("YYYY-MM-DD"),
+          // time: moment(updatedBooking.time, "HH:mm:ss").format("HH:mm"),
+          time: moment(updatedBooking.date).format("HH:mm"),
+        };
+        const updatedBookings = bookings.map((booking) =>
+          booking.id === updatedBooking.id ? formattedBooking : booking
+        );
+        setBookings(updatedBookings);
+        setFilteredBookings(updatedBookings);
+        setEditVisible(false);
+        setEditingBooking(null);
+        message.success("Booking updated successfully");
+      } else {
+        message.error("Failed to update booking");
+      }
+    } catch (error) {
+      console.error("Update error:", error);
       message.error("Failed to update booking");
     }
   };
