@@ -9,12 +9,20 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@ant-design/icons": "^5.3.7",
+    "@prisma/client": "^5.17.0",
+    "antd": "^5.19.3",
+    "autoprefixer": "^10.4.19",
+    "moment": "^2.30.1",
+    "next": "14.2.5",
+    "prisma": "^5.17.0",
     "react": "^18",
-    "react-dom": "^18",
-    "next": "14.2.5"
+    "react-dom": "^18"
   },
   "devDependencies": {
-    "postcss": "^8",
-    "tailwindcss": "^3.4.1"
+    "@babel/plugin-transform-runtime": "^7.14.5",
+    "@babel/preset-env": "^7.14.5",
+    "@babel/preset-react": "^7.14.5",
+    "babel-plugin-import": "^1.13.3"
   }
 }
