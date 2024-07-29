@@ -1,6 +1,4 @@
-"use client";
-
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Form,
   Input,
@@ -10,7 +8,7 @@ import {
   Table,
   Layout,
   Typography,
-  Modal,
+  Drawer,
   Popconfirm,
   message,
 } from "antd";
@@ -19,144 +17,116 @@ import "antd/dist/reset.css";
 
 const { Title } = Typography;
 const { Content } = Layout;
-const { Search } = Input;
 
-export default function Home() {
+export default function Bookings() {
   const [bookings, setBookings] = useState([]);
-  const [filteredBookings, setFilteredBookings] = useState([]);
-  const [formVisible, setFormVisible] = useState(false);
-  const [editVisible, setEditVisible] = useState(false);
-  const [editingBooking, setEditingBooking] = useState(null);
+  const [drawerVisible, setDrawerVisible] = useState(false);
+  const [editingBooking, setEditingBooking] = useState({});
   const [form] = Form.useForm();
-  const [editForm] = Form.useForm();
 
   useEffect(() => {
     fetch("/api/bookings")
       .then((response) => response.json())
       .then((data) => {
-        const formattedData = data.map((booking) => ({
-          ...booking,
-          date: moment(booking.date).format("YYYY-MM-DD"),
-          time: moment(booking.time, "HH:mm:ss").format("HH:mm"),
-        }));
-        setBookings(formattedData);
-        setFilteredBookings(formattedData);
-      });
+        setBookings(
+          data.map((booking) => ({
+            ...booking,
+            date: moment(booking.date).format("YYYY-MM-DD"),
+            time: moment(booking.time, "HH:mm").format("HH:mm"),
+          }))
+        );
+      })
+      .catch((error) => console.error("Failed to fetch bookings:", error));
   }, []);
 
-  const handleSearch = (value) => {
-    const searchValue = value.toLowerCase();
-    const filtered = bookings.filter(
-      (booking) =>
-        booking.name.toLowerCase().includes(searchValue) ||
-        booking.voucherNumber.toLowerCase().includes(searchValue) ||
-        booking.pickUpAddress.toLowerCase().includes(searchValue) ||
-        booking.dropOffAddress.toLowerCase().includes(searchValue)
-    );
-    setFilteredBookings(filtered);
-  };
-
-  const handleSubmit = async (values) => {
-    const date = values.date.format("YYYY-MM-DD");
-    const time = values.time.format("HH:mm:ss");
-
-    const dateTime = moment(`${date}T${time}`).toISOString();
-
-    const response = await fetch("/api/bookings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...values,
-        date: dateTime, // Use the combined dateTime
-      }),
-    });
-
-    if (response.ok) {
-      const newBooking = await response.json();
-      const formattedBooking = {
-        ...newBooking,
-        date: moment(newBooking.date).format("YYYY-MM-DD"),
-        time: moment(newBooking.time, "HH:mm:ss").format("HH:mm"),
-      };
-      setBookings([...bookings, formattedBooking]);
-      setFilteredBookings([...bookings, formattedBooking]);
+  const toggleDrawer = (visible, record = {}) => {
+    setDrawerVisible(visible);
+    if (!visible) {
       form.resetFields();
-      setFormVisible(false);
+      setEditingBooking({});
     } else {
-      message.error("Failed to add booking");
+      form.setFieldsValue({
+        ...record,
+        date: record.date ? moment(record.date) : null,
+        time: record.time ? moment(record.time, "HH:mm") : null,
+      });
+      setEditingBooking(record);
     }
   };
 
-  const handleEdit = (booking) => {
-    setEditingBooking(booking);
-    editForm.setFieldsValue({
-      ...booking,
-      date: moment(booking.date),
-      time: moment(booking.time, "HH:mm"),
-    });
-    setEditVisible(true);
-  };
+  const handleSubmit = (values) => {
+    const { date, time, ...rest } = values;
+    const formattedDate = date.format("YYYY-MM-DD");
+    const formattedTime = time.format("HH:mm");
 
-  const handleUpdate = async (values) => {
-    const date = values.date.format("YYYY-MM-DD");
-    const time = values.time.format("HH:mm:ss");
-    const dateTime = moment(`${date}T${time}`).toISOString();
-
-    try {
-      const response = await fetch(`/api/bookings`, {
-        method: "PUT",
+    fetch(
+      `/api/bookings${editingBooking.id ? `?id=${editingBooking.id}` : ""}`,
+      {
+        method: editingBooking.id ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          id: editingBooking.id, // Ensure the id is included
-          ...values,
-          date: dateTime,
+          ...rest,
+          date: formattedDate,
+          time: formattedTime,
+          id: editingBooking.id ? parseInt(editingBooking.id) : undefined, // Ensure id is an integer
         }),
-      });
-
-      if (response.ok) {
-        const updatedBooking = await response.json();
-        const formattedBooking = {
-          ...updatedBooking,
-          date: moment(updatedBooking.date).format("YYYY-MM-DD"),
-          // time: moment(updatedBooking.time, "HH:mm:ss").format("HH:mm"),
-          time: moment(updatedBooking.date).format("HH:mm"),
-        };
-        const updatedBookings = bookings.map((booking) =>
-          booking.id === updatedBooking.id ? formattedBooking : booking
-        );
-        setBookings(updatedBookings);
-        setFilteredBookings(updatedBookings);
-        setEditVisible(false);
-        setEditingBooking(null);
-        message.success("Booking updated successfully");
-      } else {
-        message.error("Failed to update booking");
       }
-    } catch (error) {
-      console.error("Update error:", error);
-      message.error("Failed to update booking");
-    }
+    )
+      .then((response) => response.json())
+      .then((data) => {
+        const updatedBookings = editingBooking.id
+          ? bookings.map((item) =>
+              item.id === data.id
+                ? {
+                    ...item,
+                    ...data,
+                    date: moment(data.date).format("YYYY-MM-DD"),
+                    time: data.time,
+                  }
+                : item
+            )
+          : [
+              ...bookings,
+              {
+                ...data,
+                date: moment(data.date).format("YYYY-MM-DD"),
+                time: data.time,
+              },
+            ];
+        setBookings(updatedBookings);
+        toggleDrawer(false);
+        message.success(
+          `Booking ${editingBooking.id ? "updated" : "added"} successfully!`
+        );
+      })
+      .catch((error) => {
+        console.error("Failed to submit booking:", error);
+        message.error(
+          `Failed to ${editingBooking.id ? "update" : "add"} booking.`
+        );
+      });
   };
 
-  const handleDelete = async (id) => {
-    const response = await fetch(`/api/bookings?id=${id}`, {
+  const handleDelete = (id) => {
+    fetch(`/api/bookings?id=${id}`, {
       method: "DELETE",
-    });
-
-    if (response.ok) {
-      const updatedBookings = bookings.filter((booking) => booking.id !== id);
-      setBookings(updatedBookings);
-      setFilteredBookings(updatedBookings);
-      message.success("Booking deleted successfully");
-    } else {
-      message.error("Failed to delete booking");
-    }
+    })
+      .then(() => {
+        const updatedBookings = bookings.filter((booking) => booking.id !== id);
+        setBookings(updatedBookings);
+        message.success("Booking deleted successfully!");
+      })
+      .catch((error) => {
+        console.error("Failed to delete booking:", error);
+        message.error("Failed to delete booking.");
+      });
   };
 
   const columns = [
     { title: "Date", dataIndex: "date", key: "date" },
     { title: "Time", dataIndex: "time", key: "time" },
     { title: "Name", dataIndex: "name", key: "name" },
+    { title: "Contact", dataIndex: "contact", key: "contact" },
     {
       title: "Pick Up Address",
       dataIndex: "pickUpAddress",
@@ -180,7 +150,7 @@ export default function Home() {
       key: "actions",
       render: (_, record) => (
         <>
-          <Button type="link" onClick={() => handleEdit(record)}>
+          <Button type="link" onClick={() => toggleDrawer(true, record)}>
             Edit
           </Button>
           <Popconfirm
@@ -200,207 +170,92 @@ export default function Home() {
     <Layout className="min-h-screen">
       <Content className="p-8">
         <Title className="text-center">Passion Wheels Bookings</Title>
-        <div className="text-center mb-8">
-          <Button type="primary" onClick={() => setFormVisible(true)}>
-            Add Booking
-          </Button>
-        </div>
-        <div className="text-center mb-8">
-          <Search
-            placeholder="Search by name, voucher number, or address"
-            onSearch={handleSearch}
-            enterButton
-            className="w-full"
-          />
-        </div>
-        <Modal
-          title="Add Booking"
-          visible={formVisible}
-          onCancel={() => setFormVisible(false)}
-          footer={null}
+        <Button
+          type="primary"
+          onClick={() => toggleDrawer(true)}
+          style={{ marginBottom: 16 }}
         >
-          <Form
-            form={form}
-            onFinish={handleSubmit}
-            layout="vertical"
-            className="bg-white p-8 rounded"
-          >
-            <Form.Item
-              name="date"
-              label="Date"
-              rules={[{ required: true, message: "Please select the date!" }]}
-            >
-              <DatePicker className="w-full" />
-            </Form.Item>
-            <Form.Item
-              name="time"
-              label="Time"
-              rules={[{ required: true, message: "Please select the time!" }]}
-            >
-              <TimePicker className="w-full" format="HH:mm" />
-            </Form.Item>
-            <Form.Item
-              name="name"
-              label="Name"
-              rules={[{ required: true, message: "Please enter the name!" }]}
-            >
-              <Input />
-            </Form.Item>
-            <Form.Item
-              name="pickUpAddress"
-              label="Pick Up Address"
-              rules={[
-                {
-                  required: true,
-                  message: "Please enter the pick up address!",
-                },
-              ]}
-            >
-              <Input />
-            </Form.Item>
-            <Form.Item
-              name="dropOffAddress"
-              label="Drop Off Address"
-              rules={[
-                {
-                  required: true,
-                  message: "Please enter the drop off address!",
-                },
-              ]}
-            >
-              <Input />
-            </Form.Item>
-            <Form.Item
-              name="driver"
-              label="Driver"
-              rules={[{ required: true, message: "Please enter the driver!" }]}
-            >
-              <Input />
-            </Form.Item>
-            <Form.Item name="comments" label="Comments">
-              <Input />
-            </Form.Item>
-            <Form.Item
-              name="agent"
-              label="Agent"
-              rules={[{ required: true, message: "Please enter the agent!" }]}
-            >
-              <Input />
-            </Form.Item>
-            <Form.Item
-              name="voucherNumber"
-              label="Voucher Number"
-              rules={[
-                { required: true, message: "Please enter the voucher number!" },
-              ]}
-            >
-              <Input />
-            </Form.Item>
-            <Form.Item>
-              <Button type="primary" htmlType="submit" className="w-full">
-                Add Booking
-              </Button>
-            </Form.Item>
-          </Form>
-        </Modal>
-        <Modal
-          title="Edit Booking"
-          visible={editVisible}
-          onCancel={() => setEditVisible(false)}
-          footer={null}
-        >
-          <Form
-            form={editForm}
-            onFinish={handleUpdate}
-            layout="vertical"
-            className="bg-white p-8 rounded"
-          >
-            <Form.Item
-              name="date"
-              label="Date"
-              rules={[{ required: true, message: "Please select the date!" }]}
-            >
-              <DatePicker className="w-full" />
-            </Form.Item>
-            <Form.Item
-              name="time"
-              label="Time"
-              rules={[{ required: true, message: "Please select the time!" }]}
-            >
-              <TimePicker className="w-full" format="HH:mm" />
-            </Form.Item>
-            <Form.Item
-              name="name"
-              label="Name"
-              rules={[{ required: true, message: "Please enter the name!" }]}
-            >
-              <Input />
-            </Form.Item>
-            <Form.Item
-              name="pickUpAddress"
-              label="Pick Up Address"
-              rules={[
-                {
-                  required: true,
-                  message: "Please enter the pick up address!",
-                },
-              ]}
-            >
-              <Input />
-            </Form.Item>
-            <Form.Item
-              name="dropOffAddress"
-              label="Drop Off Address"
-              rules={[
-                {
-                  required: true,
-                  message: "Please enter the drop off address!",
-                },
-              ]}
-            >
-              <Input />
-            </Form.Item>
-            <Form.Item
-              name="driver"
-              label="Driver"
-              rules={[{ required: true, message: "Please enter the driver!" }]}
-            >
-              <Input />
-            </Form.Item>
-            <Form.Item name="comments" label="Comments">
-              <Input />
-            </Form.Item>
-            <Form.Item
-              name="agent"
-              label="Agent"
-              rules={[{ required: true, message: "Please enter the agent!" }]}
-            >
-              <Input />
-            </Form.Item>
-            <Form.Item
-              name="voucherNumber"
-              label="Voucher Number"
-              rules={[
-                { required: true, message: "Please enter the voucher number!" },
-              ]}
-            >
-              <Input />
-            </Form.Item>
-            <Form.Item>
-              <Button type="primary" htmlType="submit" className="w-full">
-                Update Booking
-              </Button>
-            </Form.Item>
-          </Form>
-        </Modal>
+          Add Booking
+        </Button>
         <Table
-          className="mt-12"
-          dataSource={filteredBookings}
+          dataSource={bookings}
           columns={columns}
           rowKey="id"
           pagination={false}
           bordered
         />
+        <Drawer
+          title={editingBooking.id ? "Edit Booking" : "Add Booking"}
+          width={720}
+          onClose={() => toggleDrawer(false)}
+          visible={drawerVisible}
+        >
+          <Form form={form} onFinish={handleSubmit} layout="vertical">
+            <Form.Item
+              name="date"
+              label="Date"
+              rules={[{ required: true, message: "Please select the date" }]}
+            >
+              <DatePicker />
+            </Form.Item>
+            <Form.Item
+              name="time"
+              label="Time"
+              rules={[{ required: true, message: "Please select the time" }]}
+            >
+              <TimePicker format="HH:mm" />
+            </Form.Item>
+            <Form.Item name="name" label="Name" rules={[{ required: true }]}>
+              <Input />
+            </Form.Item>
+            <Form.Item
+              name="contact"
+              label="Contact"
+              rules={[{ required: true }]}
+            >
+              <Input />
+            </Form.Item>
+            <Form.Item
+              name="pickUpAddress"
+              label="Pick Up Address"
+              rules={[{ required: true }]}
+            >
+              <Input />
+            </Form.Item>
+            <Form.Item
+              name="dropOffAddress"
+              label="Drop Off Address"
+              rules={[{ required: true }]}
+            >
+              <Input />
+            </Form.Item>
+            <Form.Item
+              name="driver"
+              label="Driver"
+              rules={[{ required: true }]}
+            >
+              <Input />
+            </Form.Item>
+            <Form.Item name="agent" label="Agent" rules={[{ required: true }]}>
+              <Input />
+            </Form.Item>
+            <Form.Item
+              name="voucherNumber"
+              label="Voucher Number"
+              rules={[{ required: true }]}
+            >
+              <Input />
+            </Form.Item>
+            <Form.Item name="comments" label="Comments">
+              <Input.TextArea />
+            </Form.Item>
+            <Form.Item>
+              <Button type="primary" htmlType="submit">
+                {editingBooking.id ? "Update" : "Add"} Booking
+              </Button>
+            </Form.Item>
+          </Form>
+        </Drawer>
       </Content>
     </Layout>
   );

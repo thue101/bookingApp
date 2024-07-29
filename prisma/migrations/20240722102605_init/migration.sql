@@ -4,6 +4,7 @@ CREATE TABLE "Booking" (
     "date" TIMESTAMP(3) NOT NULL,
     "time" TEXT NOT NULL,
     "name" TEXT NOT NULL,
+    "contact" TEXT NOT NULL,
     "pickUpAddress" TEXT NOT NULL,
     "dropOffAddress" TEXT NOT NULL,
     "driver" TEXT NOT NULL,

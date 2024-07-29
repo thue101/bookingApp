@@ -12,6 +12,7 @@ model Booking {
   date           DateTime
   time           String
   name           String
+  contact        String
   pickUpAddress  String
   dropOffAddress String
   driver         String

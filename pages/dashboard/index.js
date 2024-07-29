@@ -1,74 +1,87 @@
 import React, { useState, useEffect } from "react";
-import { List, Typography, Card } from "antd";
-import axios from "axios";
+import { Layout, Typography, List, Calendar, Modal } from "antd";
 import moment from "moment";
+import "antd/dist/reset.css"; // Ensure to include antd reset CSS
 
 const { Title } = Typography;
+const { Content } = Layout;
 
-const Dashboard = () => {
+export default function Dashboard() {
   const [bookings, setBookings] = useState([]);
+  const [selectedDate, setSelectedDate] = useState(moment());
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [dailyBookings, setDailyBookings] = useState([]);
 
-  // Fetch bookings data from the API
   useEffect(() => {
-    const fetchBookings = async () => {
-      try {
-        const response = await axios.get("/api/bookings");
-        const validBookings = response.data
-          .map((booking) => ({
+    fetch("/api/bookings")
+      .then((response) => response.json())
+      .then((data) => {
+        setBookings(
+          data.map((booking) => ({
             ...booking,
-            date: moment(booking.date),
-            time: moment(booking.time, "HH:mm:ss"),
+            date: moment(booking.date).format("YYYY-MM-DD"), // Adjust formatting as needed
+            time: moment(booking.date).format("HH:mm"), // Adjust time extraction as per your data structure
           }))
-          .filter((booking) => booking.date.isSameOrAfter(moment(), "day")) // Filter for today and future bookings
-          .sort((a, b) => a.date.diff(b.date) || a.time.diff(b.time)); // Sort by date and then time
-        setBookings(validBookings);
-      } catch (error) {
-        console.error("Error fetching bookings:", error);
-      }
-    };
-    fetchBookings();
+        );
+      })
+      .catch((error) => console.error("Failed to fetch bookings:", error));
   }, []);
 
-  return (
-    <div>
-      <Title level={2}>Current and Upcoming Bookings</Title>
-      <List
-        dataSource={bookings}
-        renderItem={(item) => (
-          <List.Item>
-            <Card
-              title={`Booking on ${item.date.format(
-                "YYYY-MM-DD"
-              )} at ${item.time.format("HH:mm")}`}
-              style={{ width: "100%" }}
-            >
-              <p>
-                <strong>Name:</strong> {item.name}
-              </p>
-              <p>
-                <strong>Pick Up:</strong> {item.pickUpAddress}
-              </p>
-              <p>
-                <strong>Drop Off:</strong> {item.dropOffAddress}
-              </p>
-              <p>
-                <strong>Driver:</strong> {item.driver}
-              </p>
-              <p>
-                <strong>Comments:</strong> {item.comments || "N/A"}
-              </p>
-              <p>
-                <strong>Agent:</strong> {item.agent}
-              </p>
-              <p>
-                <strong>Voucher Number:</strong> {item.voucherNumber}
-              </p>
-            </Card>
-          </List.Item>
+  const dateCellRender = (value) => {
+    const formattedDate = value.format("YYYY-MM-DD");
+    const count = bookings.filter(
+      (booking) => booking.date === formattedDate
+    ).length;
+    return (
+      <div className="calendar-date">
+        {count > 0 && (
+          <div className="bookings-count">
+            {count} booking{count > 1 ? "s" : ""}
+          </div>
         )}
-      />
-    </div>
-  );
-};
+      </div>
+    );
+  };
 
-export default Dashboard;
+  const onSelect = (value) => {
+    setSelectedDate(value);
+    const formattedDate = value.format("YYYY-MM-DD");
+    const filteredBookings = bookings.filter(
+      (booking) => booking.date === formattedDate
+    );
+    setDailyBookings(filteredBookings);
+    setIsModalVisible(true);
+  };
+
+  const handleModalClose = () => {
+    setIsModalVisible(false);
+  };
+
+  return (
+    <Layout className="site-layout-background" style={{ padding: "24px" }}>
+      <Content style={{ padding: 24, margin: 0, minHeight: 280 }}>
+        <Title level={2}>Dashboard - Daily Bookings</Title>
+        <Calendar dateCellRender={dateCellRender} onSelect={onSelect} />
+        <Modal
+          title={`Bookings for ${selectedDate.format("YYYY-MM-DD")}`}
+          visible={isModalVisible}
+          onCancel={handleModalClose}
+          footer={null}
+        >
+          <List
+            itemLayout="horizontal"
+            dataSource={dailyBookings}
+            renderItem={(item) => (
+              <List.Item>
+                <List.Item.Meta
+                  title={item.name}
+                  description={`Time: ${item.time}, Pick up: ${item.pickUpAddress}`}
+                />
+              </List.Item>
+            )}
+          />
+        </Modal>
+      </Content>
+    </Layout>
+  );
+}
